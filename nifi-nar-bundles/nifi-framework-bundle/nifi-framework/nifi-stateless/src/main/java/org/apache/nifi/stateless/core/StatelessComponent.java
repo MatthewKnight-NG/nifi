@@ -16,11 +16,12 @@
  */
 package org.apache.nifi.stateless.core;
 
-import org.apache.nifi.stateless.bootstrap.InMemoryFlowFile;
-import org.apache.nifi.processor.Relationship;
-
 import java.util.List;
 import java.util.Queue;
+
+import org.apache.nifi.components.ValidationResult;
+import org.apache.nifi.processor.Relationship;
+import org.apache.nifi.stateless.bootstrap.InMemoryFlowFile;
 
 public interface StatelessComponent {
 
@@ -30,7 +31,7 @@ public interface StatelessComponent {
 
     boolean runRecursive(Queue<InMemoryFlowFile> queue);
 
-    boolean validate();
+    ValidationResult validate();
 
     void addIncomingConnection(String connectionId);
 

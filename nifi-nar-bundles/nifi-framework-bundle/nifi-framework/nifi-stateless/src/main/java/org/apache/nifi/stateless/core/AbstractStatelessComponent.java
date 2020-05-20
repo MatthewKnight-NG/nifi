@@ -16,9 +16,6 @@
  */
 package org.apache.nifi.stateless.core;
 
-import org.apache.nifi.logging.ComponentLog;
-import org.apache.nifi.processor.Relationship;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -27,6 +24,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.nifi.components.ValidationResult;
+import org.apache.nifi.logging.ComponentLog;
+import org.apache.nifi.processor.Relationship;
+
 public abstract class AbstractStatelessComponent implements StatelessComponent {
     private List<StatelessComponent> parents = new ArrayList<>();
     private List<String> incomingConnections = new ArrayList<>();
@@ -34,7 +35,6 @@ public abstract class AbstractStatelessComponent implements StatelessComponent {
     private final Set<Relationship> autoTermination = new HashSet<>();
     private final Set<Relationship> successOutputPorts = new HashSet<>();
     private final Set<Relationship> failureOutputPorts = new HashSet<>();
-
 
     public AbstractStatelessComponent() {
 
@@ -74,10 +74,11 @@ public abstract class AbstractStatelessComponent implements StatelessComponent {
         getContext().addConnection(relationship);
     }
 
-
-    public boolean validate() {
+    public ValidationResult validate() {
+        String subject = toString();
         if (!getContext().isValid()) {
-            return false;
+            return new ValidationResult.Builder().valid(false).subject(subject)
+                    .explanation(String.format("Component: %s has invalid connection context", subject)).build();
         }
 
         for (final Relationship relationship : getRelationships()) {
@@ -87,20 +88,26 @@ public abstract class AbstractStatelessComponent implements StatelessComponent {
             boolean hasSuccessOutputPort = this.successOutputPorts.contains(relationship);
 
             if (!(hasChildren || hasAutoterminate || hasFailureOutputPort || hasSuccessOutputPort)) {
-                getLogger().error("Component: {}, Relationship: {}, either needs to be auto-terminated or connected to another component", new Object[] {toString(), relationship.getName()});
-                return false;
+                String explanation = String.format(
+                        "Component: %s, Relationship: %s, either needs to be auto-terminated or connected to another component",
+                        subject, relationship.getName());
+                getLogger().error(explanation);
+                return new ValidationResult.Builder().valid(false).subject(subject).explanation(explanation).build();
             }
         }
 
         for (final Map.Entry<Relationship, List<StatelessComponent>> entry : this.children.entrySet()) {
             for (final StatelessComponent component : entry.getValue()) {
-                if (!component.validate()) {
-                    return false;
+                ValidationResult validationResult = component.validate();
+                if (!validationResult.isValid()) {
+                    return new ValidationResult.Builder().valid(false).subject(subject)
+                            .explanation(String.format("Child of component %s had validation error: %s", subject,
+                                    validationResult.getExplanation())).build();
                 }
             }
         }
 
-        return true;
+        return new ValidationResult.Builder().valid(true).subject(toString()).build();
     }
 
     protected Map<Relationship, List<StatelessComponent>> getChildren() {
@@ -118,8 +125,6 @@ public abstract class AbstractStatelessComponent implements StatelessComponent {
     protected boolean isAutoTerminated(final Relationship relationship) {
         return autoTermination.contains(relationship);
     }
-
-
 
     public abstract Set<Relationship> getRelationships();
 

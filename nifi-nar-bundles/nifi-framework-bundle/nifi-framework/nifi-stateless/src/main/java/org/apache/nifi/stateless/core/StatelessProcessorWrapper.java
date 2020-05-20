@@ -106,8 +106,13 @@ public class StatelessProcessorWrapper extends AbstractStatelessComponent implem
 
     private void initialize() {
         //Validate context
+        final ValidationResult validation = this.validate();
+        if (!validation.isValid()) {
+            throw new IllegalArgumentException(processor + " is not valid: " + validation.getExplanation());
+        }
+
         final Collection<ValidationResult> validationResult = context.validate();
-        if (validationResult.stream().anyMatch(a -> !a.isValid()) || !this.validate()) {
+        if (validationResult.stream().anyMatch(a -> !a.isValid())) {
             throw new IllegalArgumentException(processor + " is not valid: "
                 + validationResult.stream().map(ValidationResult::toString).collect(Collectors.joining("\n")));
         }
